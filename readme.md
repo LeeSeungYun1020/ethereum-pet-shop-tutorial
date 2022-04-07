@@ -288,3 +288,76 @@ contract TestAdoption {
 
 `adopters`의 **memory** 속성을 잘 기억하자. 메모리 속성은 솔리디티가 값을 계약의 저장소에 저장하지 않고 메모리에 임시로 저장하도록 지시한다.
 `adopters`는 배열이며 첫번째 테스트에서 `petId`를 테스트해서 입양된 펫의 ID와 일치한다는 사실을 알고 있기 때문에 배열에서 해당 ID의 위치에 계약의 주소가 지정되어 있는지를 비교해보면 된다.
+
+## 자바스크립트로 스마트 컨트랙트 테스트
+
+1. `testAdoption.test.js` 파일을 `test` 디렉토리에 생성하자.
+2. 파일에 아래 코드를 작성한다.
+
+```javascript
+const Adoption = artifacts.require("Adoption");
+
+contract("Adoption", (accounts) => {
+    let adoption;
+    let expectedPetId;
+
+    before(async () => {
+        adoption = await Adoption.deployed();
+    });
+
+    describe("펫을 입양하고 계정의 주소를 검색함", async () => {
+        before("accounts[0]가 펫을 입양", async () => {
+            await adoption.adopt(8, {from: accounts[0]});
+            expectedAdopter = accounts[0];
+        });
+    });
+});
+```
+
+우리는 다음을 가져와서 계약을 시작한다.
+
+- `Adoption`: 테스트하고 싶은 스마트 계약, `Adoption` 컨트랙트를 `artifacts.require`를 사용하여 import한다.
+
+테스트를 작성할 때, `accounts`를 인자로 받는 콜백 함수를 작성한다. 이를 통해 테스트 중 네트워크에서 사용되는 계정을 제공받는다.
+
+다음으로 `before`를 사용하여 아래에 대한 초기 설정을 제공한다.
+
+- 8번 id를 통해 펫을 입양한다. 네트워크의 테스트 계정 중 첫번째 계정에 할당된다.
+- 이 함수는 나중에 `accounts[0]`에서 petId가 8이 맞는지 확인할 때 사용된다.
+
+### adopt() 함수 테스트
+
+`adopt` 함수를 테스트하기 위해 성공시에는 해당되는 입양자를 반환한다는 사실을 떠올려보자. 우리는 주어진 petID에 기반하여 입양자를 확인할 수 있다. petID는 `adopt` 함수내에서
+expectedAdopter와 비교할 수 있다.
+
+1. 아래 코드를 `testAdoption.test.js` 테스트 파일에 추가하자.
+
+```javascript
+it("펫 id로 소유자의 주소를 가져올 수 있다.", async () => {
+    const adopter = await adoption.adopters(8);
+    assert.equal(adopter, expectedAdopter, "첫번째 계정이 소유자여야 함!");
+});
+```
+
+> 코드는 before 코드 블록 다음에 추가해야한다.
+
+- 스마트 컨트랙트 메소드 `adopters`를 호출하여 어떤 주소가 petID 8번의 펫을 입양했는지 본다.
+- 트러플은 assert 함수를 사용하도록 `Chai`를 import한다. 실제 값, 예상 값, 실패 메시지를 `assert.equal()`에 전달한다.
+
+### 모든 펫 소유자를 검색하여 테스트
+
+배열은 하나의 키에 대해 하나의 값만 반환할 수 있으므로 전체 배열을 반환하는 getter를 새로 만들었었다.
+
+1. 아래 함수를 `testAdoption.test.js` 파일에 추가한다.
+
+```javascript
+it("모든 펫 소유자의 주소를 가져올 수 있다.", async () => {
+    const adopters = await adoption.getAdopters();
+    assert.equal(adopters[8], expectedAdopter, "컬렉션에 입양된 펫의 소유가자 있어야 함!");
+});
+```
+
+> 코드는 이전 단계에서 작성한 it 코드 블록 다음에 추가하면 된다.
+
+adopters는 배열이고 우리는 첫번째 테스트에서 petId가 8인 펫을 입양했다는 사실을 알고 있기 때문에 계약의 주소와 찾길 기대하는 주소를 비교하고 있다.
+
