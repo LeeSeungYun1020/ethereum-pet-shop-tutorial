@@ -361,3 +361,57 @@ it("모든 펫 소유자의 주소를 가져올 수 있다.", async () => {
 
 adopters는 배열이고 우리는 첫번째 테스트에서 petId가 8인 펫을 입양했다는 사실을 알고 있기 때문에 계약의 주소와 찾길 기대하는 주소를 비교하고 있다.
 
+## 테스트 실행
+
+1. 터미널로 돌아가서 테스트를 실행해보자.
+
+```bash
+truffle test
+```
+
+> 가나슈를 실행한 상태에서 실행해야 한다.
+
+2. 테스트가 종료되면 아래와 같이 표시되는 것을 확인할 수 있다!
+
+```bash
+Using network 'development'.
+
+
+Compiling your contracts...
+===========================
+> Compiling .\contracts\Adoption.sol
+> Compiling .\contracts\Migrations.sol
+> Compiling .\test\TestAdoption.sol
+> Compiling truffle\Assert.sol
+> Compiling truffle\AssertAddress.sol
+> Compiling truffle\AssertAddressArray.sol
+> Compiling truffle\AssertBalance.sol
+> Compiling truffle\AssertBool.sol
+> Compiling truffle\AssertBytes32.sol
+> Compiling truffle\AssertBytes32Array.sol
+> Compiling truffle\AssertGeneral.sol
+> Compiling truffle\AssertInt.sol
+> Compiling truffle\AssertIntArray.sol
+> Compiling truffle\AssertString.sol
+> Compiling truffle\AssertUint.sol
+> Compiling truffle\AssertUintArray.sol
+> Compiling truffle\DeployedAddresses.sol
+> Artifacts written to C:\Users\fabi8\AppData\Local\Temp\test--2772-1nuilNm0ntUS
+> Compiled successfully using:
+   - solc: 0.5.16+commit.9c3226ce.Emscripten.clang
+
+
+  TestAdoption
+    √ testUserCanAdoptPet (507ms)
+    √ testGetAdopterAddressByPetId (456ms)
+    √ testGetAdopterAddressByPetIdInArray (509ms)
+
+  Contract: Adoption
+    펫을 입양하고 계정의 주소를 검색함
+      √ 펫 id로 소유자의 주소를 가져올 수 있다. (179ms)
+      √ 모든 펫 소유자의 주소를 가져올 수 있다. (110ms)
+
+
+  5 passing (16s)
+```
+

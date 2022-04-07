@@ -30,6 +30,6 @@ contract TestAdoption {
     function testGetAdopterAddressByPetIdInArray() public {
         // 계약의 저장소가 아닌 메모리에 입양자를 저장
         address [16] memory adopters = adoption.getAdopters();
-        Asset.equal(adopters[expectedPetId], expectedAdopter, "해당 펫의 소유자는 이 계약이어야 함!");
+        Assert.equal(adopters[expectedPetId], expectedAdopter, "해당 펫의 소유자는 이 계약이어야 함!");
     }
 }
