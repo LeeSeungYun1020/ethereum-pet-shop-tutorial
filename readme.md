@@ -252,7 +252,7 @@ contract TestAdoption {
 > 앞에서 만든 TestAdoption 계약 내부에 삽입해야 한다.
 
 - 앞에서 선언한 Adoption 스마트 계약을 expectedPetId로 호출한다.
-- 마지막으로 실제 값(결과)과 예상 값, 실패 메시지를 `Asset.equal()`에 전달한다.
+- 마지막으로 실제 값(결과)과 예상 값, 실패 메시지를 `Assert.equal()`에 전달한다.
 
 ### 특정 펫의 소유자 검색 테스트
 
@@ -282,7 +282,7 @@ contract TestAdoption {
     function testGetAdopterAddressByPetIdInArray() public {
         // 계약의 저장소가 아닌 메모리에 저장
         address [16] memory adopters = adoption.getAdopters();
-        Asset.equal(adopters[expectedPetId], expectedAdopter, "해당 펫의 소유자는 이 계약이어야 함!");
+        Assert.equal(adopters[expectedPetId], expectedAdopter, "해당 펫의 소유자는 이 계약이어야 함!");
     }
 ```
 
@@ -414,4 +414,139 @@ Compiling your contracts...
 
   5 passing (16s)
 ```
+
+## 스마트 컨트랙트와 상호작용하는 UI 만들기
+
+지금까지 스마트 계약을 만들고, 로컬 테스트 블록체인에 배포하고 콘솔을 통해 상호작용해보았다. 이제 펫 샵을 운영할 수 있도록 UI를 만들 차례이다.
+
+`pet-shop` 트러플 박스에는 이미 프로트엔드 코드의 일부가 포함되어있다. 해당 코드는 `src` 폴더에 위치한다.
+
+처음 시작하는 만큼 웹팩 같은 빌드 시스템을 사용하지 않고 프로트 엔드를 구성하였다. 앱의 구조는 모두 갖추어져 있다. 우리는 이더리움과 관련된 코드만 채워넣을 예정이다. 이러한 방식을 이용하여 프론트 엔드 개발시에
+배운 내용을 활용할 수 있을 것이다.
+
+### web3 인스턴스화
+
+1. 에디터로 `/src/js/app.js` 파일을 열자.
+2. 파일을 살펴보자. 우리 어플리케이션을 관리하고 init()으로 펫 데이터를 로드한 다음 initWeb3() 함수를 호출하는 전역 App 객체가 있다. web3 자바스크립트 라이브러리는 이더리움 블록체인과
+   상호작용한다. web3로 사용자 계정을 검색하고, 트랜잭션을 전송하며, 스마트 계약과 상호작용하는 등의 동작을 수행할 수 있다.
+3. `initWeb3`에 작성되어 있는 여러 줄의 주석을 지우고 아래 코드로 채워보자.
+
+```javascript
+// 모던 dApp 브라우저
+if (window.ethereum) {
+    console.log("모던 dApp 브라우저")
+    App.web3Provider = window.ethereum;
+    try {
+        // 계정 액세스 요청
+        await window.ethereum.enable();
+    } catch (e) {
+        // 사용자가 계정 액세스 거부
+        console.error("사용자가 계정 액세스 거부")
+        alert("계정 액세스가 거부되었습니다.")
+    }
+}
+// 이전 dApp 브라우저
+else if (window.web3) {
+    console.log("이전 dApp 브라우저")
+    App.web3Provider = window.web3.currentProvider;
+}
+// 주입된 web3 인스턴스가 감지되지 않는 경우, 가나슈로 대체
+else {
+    console.log("가나슈로 대체")
+    App.web3Provider = new Web3.providers.HttpProvider('http://localhost:7545');
+}
+web3 = new Web3(App.web3Provider)
+```
+
+> Replace me...라고 되어 있는 주석을 지우고 코드를 작성하면 된다.
+
+- 먼저 `ethereum` 제공자(provider)가 `window` 객체에 주입되었는지를 통해 모던 dApp 브라우저 또는 최신 버젼의 메타마스크를 사용하는지 확인한다. web3 오브젝트를
+  만들때 `window.ethereum`을 사용한다. 주의할 점은 계정에 접근하기 위해 `ethereum.enable()`를 명시적으로 요청해야 한다.
+- `ethereum` 객체가 없는 경우, web3 인스턴스가 있는지 확인한다. 인스턴스가 존재하는 경우는 Mist나 이전 버전의 메타마스크 같이 오래된 dApp 브라우저를 사용하고 있는 경우이다. 인스턴스의
+  제공자를 받아 web3 객체를 만들 때 사용한다.
+- 주입된 web3 인스턴스도 없는 경우, 로컬 제공자를 이용하여 web3 객체를 생성한다. 개발 환경에서는 괜찮지만 프로덕션 환경에서는 보안에 취약하므로 적합하지 않다.
+
+### 컨트랙트 인스턴스화
+
+이제 web3를 통해 이더리움과 상호작용할 수 있다. 우리는 web3가 어디서 찾아야하고 어떻게 동작해야 하는지 알도록 하기 위해 스마트 계약을 인스턴스화해야 한다. 트러플은 `@truffle/contract`
+라이브러리를 통해 이 작업을 돕는다. 계약에 대한 정보를 마이그레이션과 함께 동기화하여 유지하므로 계약의 배포된 주소를 수동으로 변경할 필요가 없다.
+
+1. 계속해서 `/src/js/app.js` 파일에서 `initContract`의 주석 부분을 지우고 아래 코드를 작성하자.
+
+```javascript
+$.getJSON('Adoption.json', (data) => {
+    // 필요한 계약 아티팩트 파일을 가져와 @truffle/contract로 인스턴스화한다.
+    const AdoptionArtifact = data;
+    App.contracts.Adoption = TruffleContract(AdoptionArtifact);
+
+    // 우리 계약으로 공급자를 설정한다.
+    App.contracts.Adoption.setProvider(App.web3Provider);
+
+    // 입양된 펫을 탐색하고 표시하기 위해 우리 계약을 사용한다.
+    return App.markAdopted();
+});
+```
+
+- 먼저 스마트 계약을 위한 아티팩트 파일을 탐색한다.
+  **아티팩트는 우리 계약에 대한 정보로 배포된 주소, 어플리케이션 바이너리 인터페이스(ABI)가 있다. ABI는 자바스크립트 객체로 어떻게 계약(변수, 함수, 파라미터를 포함해서)과 상호 작용하는지 정의한다.**
+- 콜백에 아티팩트가 있으면 TruffleContract에 전달한다. 이것으로 상호작용 가능한 계약의 인스턴스를 생성한다.
+- 인스턴스화된 계약으로 web3를 설정할때 저장하였던 `App.web3Provider` 값으로 web3 재공자를 설정한다.
+- 그런 다음 이전 방문에서 이미 펫이 입양된 경우 앱의 `markAdopted` 함수를 호출한다. 스마트 계약의 데이터가 변경될 때마다 UI를 업데이트해야 하므로 별도의 함수로 캡슐화하였다.
+
+### 입양된 펫 구하고 UI 업데이트 하기
+
+1. `src/js/app.js`에서 `markAdopted` 부분의 주석을 지우고 아래 코드를 입력하자.
+
+```javascript
+let adoptionInstance;
+
+App.contracts.Adoption.deployed().then((instance) => {
+    adoptionInstance = instance;
+    return adoptionInstance.getAdopters.call();
+}).then((adopters) => {
+    for (let i = 0; i < adopters.length; i++) {
+        if (adopters[i] !== '0x0000000000000000000000000000000000000000') {
+            $('.panel-pet').eq(i).find('button').text('Success').attr('disabled', true);
+        }
+    }
+}).catch((err) => {
+    console.log(err.message);
+});
+```
+
+- 배포된 `Adoption` 계약에 접근하여 인스턴스에서 `getAdopters()`를 호출하였다.
+- 먼저 `adoptionInstance`를 스마트 계약 호출 전 외부에 선언하였다. 따라서 처음에 인스턴스를 검색한 후 인스턴스에 액세스할 수 있다.
+- `call()`을 사용하면 풀 트랜잭션을 보낼 필요 없이 블록체인에서 데이터를 읽을 수 있다. 다시 말해 이더를 소모하지 않는다.
+- `getAdopters()` 호출 후에는 배열을 순회하면서 펫에 할당된 주소가 있는지 확인한다. 이더리움은 배열을 16개의 빈 주소(0x0...0)로 초기화한다. 따라서 null이나 false 같은 값 대신
+  string 주소값을 이용하여 비교를 수행해야 한다.
+- 해당 주소의 `petId`를 찾으면 입양 버튼을 비활성화 하고 버튼의 텍스트를 성공으로 변경하여 사용자가 피드백을 확인할 수 있도록 한다.
+- 오류는 콘솔에 표시될 것이다.
+
+### adopt() 함수 다루기
+
+1. 역시 `src/js/app.js`에서 `handleAdopt`의 주석을 지우고 아래 코드를 입력하자.
+
+```javascript
+let adoptionInstance;
+web3.eth.getAccounts((error, accounts) => {
+    if (error)
+        console.log(error);
+    const account = accounts[0];
+    App.contracts.Adoption.deployed().then((instance) => {
+        adoptionInstance = instance;
+        // 계정을 전송하여 트랙잭션으로 입양 실행
+        return adoptionInstance.adopt(petId, {from: account})
+    }).then((result) => {
+        return App.markAdopted();
+    }).then((err) => {
+        console.log(err.message);
+    })
+});
+```
+
+- 사용자 계정을 가지고 오기 위해 web3를 사용하였다. 에러 체크 이후 콜백에서 첫번째 계정을 선택한다.
+- 위에서 한 것처럼 계약을 배포하고 인스턴스를 `adoptionInstance`에 저장한다. 이번에는 call 대신 **transaction**을 전송한다. 트랜잭션은 `from` 주소를 요구하며 비용이 발생한다.
+  이더에서 사용되는 비용은 가스라고 불린다. 가스 비용은 스마트 컨트랙트에서 계산을 수행하거나 데이터를 저장할때 발생한다. 펫의 ID와 계정 주소를 포함하는 객체로 adopt() 함수를 실행하면서 트랜잭션을
+  전송한다.
+- 트랜잭션 전송 결과는 트랜잭션 객체로, 오류가 없다면 `markAdopted()` 함수를 호출하여 새롭게 저장된 데이터와 UI를 동기화한다.
 
